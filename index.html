@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Guadeloupe"/>
+  <meta name="theme-color" content="#0a1628"/>
+  <title>Guadeloupe 🌺</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#0a1628;font-family:'Georgia',serif;overscroll-behavior:none;}
+    ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:2px}
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500&display=swap');
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo,memo} = React;
+
+// ── STORAGE (localStorage pour GitHub Pages) ──────────────────────────────────
+const STORAGE_KEY = "gwad_trip_v5";
+const PREFS_KEY   = "gwad_prefs_v5";
+const CHECK_KEY   = "gwad_check_v5";
+const ls = {
+  get: k => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):null; } catch(e){return null;} },
+  set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch(e){} },
+};
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const DEFAULT_TRIP = {
+  destination:"Guadeloupe", startDate:"2026-04-12", endDate:"2026-04-22", archived:false,
+  itinerary:[
+    {day:1,emoji:"✈️",title:"Arrivée",
+     lodging:"Bas Vent\nImpasse Petit Bas Vent\n97126 Deshaies\nCheck-in : à partir de 15h · Check-out : 10h",
+     activities:[{time:"13h15",label:"Atterrissage Pointe-à-Pitre",url:""},{time:"14h30",label:"Récupération voiture de location",url:""},{time:"15h00",label:"Check-in Bas Vent – Deshaies",url:""},{time:"19h00",label:"Installation & premier dîner créole",url:""}]},
+    {day:2,emoji:"🌺",title:"Jardin Botanique de Deshaies",
+     lodging:"Bas Vent\nImpasse Petit Bas Vent\n97126 Deshaies\nCheck-in : à partir de 15h · Check-out : 10h",
+     activities:[{time:"09h00",label:"Visite du Jardin Botanique de Deshaies",url:"https://jardin-botanique.com/"},{time:"13h00",label:"Déjeuner à Deshaies",url:""},{time:"15h00",label:"Plage de la Grande Anse",url:""},{time:"19h00",label:"Dîner & coucher de soleil",url:""}]},
+    {day:3,emoji:"🤿",title:"Excursion Barrière de Corail",
+     lodging:"Bas Vent\nImpasse Petit Bas Vent\n97126 Deshaies\nCheck-in : à partir de 15h · Check-out : 10h",
+     activities:[{time:"08h00",label:"Excursion barrière de corail",url:"https://www.guadeloupe-excursion.com/excursion/tarifs"},{time:"12h30",label:"Retour & déjeuner",url:""},{time:"15h00",label:"Baignade & détente",url:""},{time:"19h00",label:"Dîner à Deshaies",url:""}]},
+    {day:4,emoji:"🌊",title:"Bouillante",
+     lodging:"Entre 2 Ô\nRte de Birloton\nBouillante 97125\nCheck-in : à partir de 16h30 · Check-out : 11h",
+     activities:[{time:"10h00",label:"Départ pour Bouillante",url:""},{time:"11h00",label:"Exploration village & plages",url:""},{time:"13h00",label:"Déjeuner vue mer",url:""},{time:"16h30",label:"Check-in Entre 2 Ô – Bouillante",url:""},{time:"19h00",label:"Dîner poisson frais",url:""}]},
+    {day:5,emoji:"🛶",title:"Canoë – Réserve Cousteau",
+     lodging:"Entre 2 Ô\nRte de Birloton\nBouillante 97125\nCheck-in : à partir de 16h30 · Check-out : 11h",
+     activities:[{time:"09h00",label:"Canoë – Îlet Pigeons (Réserve Cousteau)",url:"https://reservation.gwadapagaie.com/fr/activites"},{time:"13h00",label:"Déjeuner à Bouillante",url:""},{time:"15h00",label:"Plongée libre & snorkeling",url:""},{time:"19h00",label:"Dîner & soirée",url:""}]},
+    {day:6,emoji:"🌿",title:"Route de la Traversée & Chutes du Carbet",
+     lodging:"Jardin de Malanga\n60 route de l'Hermitage\nTrois-Rivières 97114\nCheck-in : à partir de 15h · Check-out : 12h",
+     activities:[{time:"08h00",label:"Route de la Traversée – Parc National",url:"https://www.guadeloupe-parcnational.fr/fr/des-decouvertes/ou-sinformer/chutes-du-carbet"},{time:"10h30",label:"Randonnée Chutes du Carbet",url:"https://www.guadeloupe-parcnational.fr/fr/des-decouvertes/ou-sinformer/chutes-du-carbet"},{time:"13h00",label:"Déjeuner en route",url:""},{time:"15h00",label:"Check-in Jardin de Malanga",url:""},{time:"19h00",label:"Dîner gastronomique",url:""}]},
+    {day:7,emoji:"⛵",title:"Excursion Terre-de-Bas",
+     lodging:"Relais du Moulin\n4 rue du Moulin\n97180 Sainte-Anne\nCheck-in : à partir de 16h · Check-out : 12h",
+     activities:[{time:"08h00",label:"Ferry pour Terre-de-Bas",url:"https://www.ctmdeher.com/"},{time:"09h00",label:"Exploration de l'île",url:"https://www.ctmdeher.com/"},{time:"13h00",label:"Déjeuner aux Saintes",url:""},{time:"15h30",label:"Retour & route vers Sainte-Anne",url:""},{time:"16h00",label:"Check-in Relais du Moulin",url:""}]},
+    {day:8,emoji:"🏖️",title:"Sainte-Anne",
+     lodging:"Relais du Moulin\n4 rue du Moulin\n97180 Sainte-Anne\nCheck-in : à partir de 16h · Check-out : 12h",
+     activities:[{time:"09h00",label:"Plage de Sainte-Anne",url:""},{time:"12h00",label:"Déjeuner – spécialités locales",url:""},{time:"14h00",label:"Exploration village & marché",url:""},{time:"17h00",label:"Coucher de soleil",url:""},{time:"19h30",label:"Dîner en bord de mer",url:""}]},
+    {day:9,emoji:"🌸",title:"Visite de Petite Terre",
+     lodging:"Relais du Moulin\n4 rue du Moulin\n97180 Sainte-Anne\nCheck-in : à partir de 16h · Check-out : 12h",
+     activities:[{time:"08h30",label:"Excursion Petite Terre – iguanes & lagon",url:"https://www.uhaina-croisieres-guadeloupe.com/excursion-petite-terre/"},{time:"13h00",label:"Pique-nique sur l'île",url:""},{time:"16h00",label:"Retour & détente",url:""},{time:"19h30",label:"Dîner gastronomique",url:""}]},
+    {day:10,emoji:"🎭",title:"Saint-François",
+     lodging:"Relais du Moulin\n4 rue du Moulin\n97180 Sainte-Anne\nCheck-in : à partir de 16h · Check-out : 12h",
+     activities:[{time:"10h00",label:"Visite de Saint-François",url:""},{time:"12h00",label:"Déjeuner au port",url:""},{time:"14h00",label:"Plage des Raisins Clairs",url:""},{time:"16h30",label:"Shopping souvenirs",url:""},{time:"19h30",label:"Dernier grand dîner",url:""}]},
+    {day:11,emoji:"🌅",title:"Départ",
+     lodging:"Relais du Moulin\n4 rue du Moulin\n97180 Sainte-Anne\nCheck-out : 12h",
+     activities:[{time:"09h00",label:"Dernier bain – plage de Sainte-Anne",url:""},{time:"11h00",label:"Check-out Relais du Moulin",url:""},{time:"12h00",label:"Route vers l'aéroport",url:""},{time:"14h00",label:"Restitution voiture",url:""},{time:"Soir",label:"Vol retour · Atterrissage Paris puis Lille",url:""}]},
+  ],
+  budget:[
+    {label:"Vol A/R",icon:"✈️",expenses:[]},{label:"Hébergement",icon:"🏡",expenses:[]},
+    {label:"Transports",icon:"🚗",expenses:[]},{label:"Restauration",icon:"🍽️",expenses:[]},
+    {label:"Activités",icon:"🎒",expenses:[]},{label:"Divers",icon:"🛍️",expenses:[]},
+  ],
+};
+
+const DEFAULT_PREFS = {theme:"dark",offline:false,geo:false};
+
+const DEFAULT_PLACES = [
+  {name:"Deshaies – Grande Anse",cat:"Plage",icon:"🏖️",note:"Plage sauvage, décor de film",lat:16.309,lng:-61.794,url:""},
+  {name:"Jardin Botanique Deshaies",cat:"Culture",icon:"🌺",note:"Flamants roses, perroquets, végétation luxuriante",lat:16.311,lng:-61.798,url:"https://jardin-botanique.com/"},
+  {name:"Réserve Cousteau",cat:"Nature",icon:"🤿",note:"Parc marin, plongée exceptionnelle",lat:16.081,lng:-61.774,url:"https://reservation.gwadapagaie.com/fr/activites"},
+  {name:"Chutes du Carbet",cat:"Nature",icon:"💧",note:"3 cascades en forêt tropicale",lat:16.060,lng:-61.626,url:"https://www.guadeloupe-parcnational.fr/fr/des-decouvertes/ou-sinformer/chutes-du-carbet"},
+  {name:"Terre-de-Bas (Les Saintes)",cat:"Île",icon:"⛵",note:"Île préservée, architecture colorée",lat:15.858,lng:-61.658,url:"https://www.ctmdeher.com/"},
+  {name:"Plage de Sainte-Anne",cat:"Plage",icon:"🌊",note:"Eaux turquoise, lagon naturel",lat:16.218,lng:-61.378,url:""},
+  {name:"Petite Terre",cat:"Île",icon:"🌸",note:"Réserve naturelle, iguanes & lagon cristallin",lat:16.174,lng:-61.117,url:"https://www.uhaina-croisieres-guadeloupe.com/excursion-petite-terre/"},
+  {name:"Saint-François",cat:"Culture",icon:"🎭",note:"Port de pêche, marina, plages sauvages",lat:16.251,lng:-61.278,url:""},
+  {name:"Excursion Barrière de Corail",cat:"Nature",icon:"🐠",note:"Snorkeling & plongée",lat:16.200,lng:-61.750,url:"https://www.guadeloupe-excursion.com/excursion/tarifs"},
+];
+
+const DEFAULT_CHECKLIST = [
+  {cat:"Documents",items:["Carte d'identité / Passeport","Billets d'avion imprimés","Réservations hébergements (×4)","Assurance voyage","Permis de conduire"]},
+  {cat:"Santé",items:["Crème solaire haute protection","Anti-moustiques (DEET)","Trousse premiers secours","Médicaments personnels","Sérum physiologique"]},
+  {cat:"Vêtements",items:["Maillots de bain (×3)","Vêtements légers","Chaussures de randonnée","Tongs","Coupe-vent léger"]},
+  {cat:"Équipement",items:["Masque & tuba","Appareil photo étanche","Adaptateur électrique","Gourde réutilisable","Sac à dos randonnée"]},
+  {cat:"Activités",items:["Résa canoë Îlet Pigeons","Résa excursion corail","Résa excursion Petite Terre","Résa ferry Terre-de-Bas"]},
+];
+
+const EMOJIS=["✈️","🏖️","🌋","🌿","⛵","🌸","🌅","🏝️","🤿","🦋","🍹","🎉","🌺","🐠","🏄","🦜","🌊","🦩","🍍","🎭","🛶","🦎","🌴"];
+const CAT_COLORS={Plage:"#00b4d8",Nature:"#52b788",Île:"#f4a261",Culture:"#e07a5f",Histoire:"#c77dff"};
+const WMO={0:"Ciel dégagé ☀️",1:"Peu nuageux 🌤️",2:"Partiellement nuageux ⛅",3:"Couvert ☁️",51:"Bruine légère 🌦️",61:"Pluie légère 🌧️",63:"Pluie 🌧️",80:"Averses 🌦️",95:"Orage ⛈️"};
+const THEMES={
+  dark:{bg:"linear-gradient(135deg,#0a1628 0%,#0d2137 50%,#071a2e 100%)",bgCard:"rgba(255,255,255,0.04)",bgSheet:"#0c1d30",border:"rgba(255,200,100,0.12)",borderStrong:"rgba(255,200,100,0.28)",text:"#e8dcc8",textMuted:"rgba(232,220,200,0.45)",accent:"#c9a84c",accentGrad:"linear-gradient(135deg,#c9a84c,#e8c56a)",accentText:"#0a1628",inputBg:"rgba(255,255,255,0.06)",tabActiveBg:"rgba(201,168,76,0.09)",headerBg:"linear-gradient(180deg,rgba(255,180,50,0.09) 0%,transparent 100%)",danger:"#e07a5f",success:"#52b788"},
+  light:{bg:"linear-gradient(135deg,#f7f3ed 0%,#fffdf8 50%,#f0ebe2 100%)",bgCard:"rgba(255,255,255,0.72)",bgSheet:"#f4efe6",border:"rgba(160,120,40,0.15)",borderStrong:"rgba(160,120,40,0.35)",text:"#2d2416",textMuted:"rgba(45,36,22,0.45)",accent:"#a0762a",accentGrad:"linear-gradient(135deg,#a0762a,#c9a84c)",accentText:"#fff",inputBg:"rgba(0,0,0,0.04)",tabActiveBg:"rgba(160,118,42,0.08)",headerBg:"linear-gradient(180deg,rgba(200,160,60,0.1) 0%,transparent 100%)",danger:"#c0392b",success:"#27ae60"},
+};
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const fmtDate=d=>d?new Date(d).toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}):"";
+const fmtDateShort=d=>d?new Date(d).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}):"";
+const getDaysUntil=d=>{if(!d)return null;const t=new Date();t.setHours(0,0,0,0);const s=new Date(d);s.setHours(0,0,0,0);return Math.ceil((s-t)/86400000);};
+const getTripDayIndex=start=>{const d=-getDaysUntil(start);return(d!==null&&d>=0)?d:null;};
+const addDays=(dateStr,n)=>{const d=new Date(dateStr);d.setDate(d.getDate()+n);return d.toISOString().split("T")[0];};
+const sumExp=exps=>exps.reduce((a,e)=>a+e.amount,0);
+
+// ── DEBOUNCE ─────────────────────────────────────────────────────────────────
+function useDebounce(fn,delay){
+  const timer=useRef(null);
+  return useCallback((...args)=>{clearTimeout(timer.current);timer.current=setTimeout(()=>fn(...args),delay);},[fn,delay]);
+}
+
+// ── LEAFLET MAP ───────────────────────────────────────────────────────────────
+const LeafletMap=memo(function LeafletMap({lat,lng,zoom=10,markers=[],height=180}){
+  const ref=useRef(),mapRef=useRef();
+  const mk=useMemo(()=>JSON.stringify(markers),[markers]);
+  useEffect(()=>{
+    if(!window.L)return;
+    if(mapRef.current){mapRef.current.remove();mapRef.current=null;}
+    const map=window.L.map(ref.current,{zoomControl:false,attributionControl:false}).setView([lat,lng],zoom);
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    markers.forEach(m=>{
+      const icon=window.L.divIcon({className:"",html:`<div style="background:#c9a84c;border:2px solid white;border-radius:50%;width:14px;height:14px;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`,iconSize:[14,14],iconAnchor:[7,7]});
+      window.L.marker([m.lat,m.lng],{icon}).bindPopup(m.label||"").addTo(map);
+    });
+    mapRef.current=map;
+    return()=>{if(mapRef.current){mapRef.current.remove();mapRef.current=null;}};
+  },[lat,lng,zoom,mk]);
+  return <div ref={ref} style={{height,borderRadius:12,overflow:"hidden",zIndex:1}}/>;
+});
+
+// ── TOGGLE ────────────────────────────────────────────────────────────────────
+const Toggle=memo(function Toggle({value,onChange,label,t}){
+  return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 0"}}>
+      <span style={{fontFamily:"'Jost',sans-serif",fontSize:14,color:t.text}}>{label}</span>
+      <div onClick={()=>onChange(!value)} style={{width:44,height:24,borderRadius:12,cursor:"pointer",position:"relative",background:value?t.accentGrad:"rgba(128,128,128,0.25)",transition:"background 0.3s"}}>
+        <div style={{position:"absolute",top:3,left:value?23:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.3s",boxShadow:"0 1px 4px rgba(0,0,0,.25)"}}/>
+      </div>
+    </div>
+  );
+});
+
+// ── SHEET ─────────────────────────────────────────────────────────────────────
+function Sheet({open,onClose,title,children,t}){
+  if(!open)return null;
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"flex-end"}}>
+      <div style={{width:"100%",maxWidth:480,margin:"0 auto",background:t.bgSheet,borderRadius:"20px 20px 0 0",padding:"24px 20px 40px",border:`1px solid ${t.border}`,maxHeight:"85vh",overflowY:"auto",animation:"slideUp 0.3s ease"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <span style={{fontSize:20,color:t.text}}>{title}</span>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,color:t.textMuted,cursor:"pointer"}}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+function App(){
+  const[prefs,setPrefs]=useState(()=>ls.get(PREFS_KEY)||DEFAULT_PREFS);
+  const[trip,setTrip]=useState(()=>{const s=ls.get(STORAGE_KEY);return s?.trip||DEFAULT_TRIP;});
+  const[places,setPlaces]=useState(()=>{const s=ls.get(STORAGE_KEY);return s?.places||DEFAULT_PLACES;});
+  const[archives,setArchives]=useState(()=>{const s=ls.get(STORAGE_KEY);return s?.archives||[];});
+  const[clCats,setClCats]=useState(()=>{const s=ls.get(CHECK_KEY);return s?.cats||DEFAULT_CHECKLIST;});
+  const[checked,setChecked]=useState(()=>{const s=ls.get(CHECK_KEY);return s?.checked||{};});
+  const[tab,setTab]=useState("resume");
+  const[activeDay,setActiveDay]=useState(0);
+  const[collapsed,setCollapsed]=useState({});
+  const[showPrefs,setShowPrefs]=useState(false);
+  const[showArchive,setShowArchive]=useState(false);
+  const[emojiPickDay,setEmojiPickDay]=useState(null);
+  const[weather,setWeather]=useState(null);
+  const[wxLoading,setWxLoading]=useState(false);
+  const[geoPos,setGeoPos]=useState(null);
+  const[expInput,setExpInput]=useState({});
+  const[expLabel,setExpLabel]=useState({});
+  const[headerEdit,setHeaderEdit]=useState(null);
+  const[headerVal,setHeaderVal]=useState("");
+  const[newItemCat,setNewItemCat]=useState(0);
+  const[newItemText,setNewItemText]=useState("");
+  const[newCatText,setNewCatText]=useState("");
+  // Logement edit state (v4 feature)
+  const[editingLodge,setEditingLodge]=useState(false);
+  const[lodgeVal,setLodgeVal]=useState("");
+
+  const t=THEMES[prefs.theme];
+  const daysUntil=useMemo(()=>getDaysUntil(trip.startDate),[trip.startDate]);
+  const tripDayIdx=useMemo(()=>getTripDayIndex(trip.startDate),[trip.startDate]);
+  const totalDays=trip.itinerary.length;
+
+  // Debounced saves
+  const _saveTrip=useCallback((tr,pl,ar)=>ls.set(STORAGE_KEY,{trip:tr,places:pl,archives:ar}),[]);
+  const saveTrip=useDebounce(_saveTrip,800);
+  useEffect(()=>saveTrip(trip,places,archives),[trip,places,archives]);
+  const _saveCheck=useCallback((cats,ch)=>ls.set(CHECK_KEY,{cats,checked:ch}),[]);
+  const saveCheck=useDebounce(_saveCheck,600);
+  useEffect(()=>saveCheck(clCats,checked),[clCats,checked]);
+  const savePrefs=useCallback(p=>ls.set(PREFS_KEY,p),[]);
+
+  // Geolocation
+  useEffect(()=>{
+    if(prefs.geo&&navigator.geolocation)
+      navigator.geolocation.getCurrentPosition(p=>setGeoPos({lat:+p.coords.latitude.toFixed(5),lng:+p.coords.longitude.toFixed(5)}),()=>setGeoPos(null));
+    else setGeoPos(null);
+  },[prefs.geo]);
+
+  // Weather
+  useEffect(()=>{
+    if(prefs.offline){setWeather(null);return;}
+    setWxLoading(true);
+    const lat=geoPos?.lat??16.1,lng=geoPos?.lng??-61.73;
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weathercode,windspeed_10m&timezone=America%2FGuadeloupe`)
+      .then(r=>r.json()).then(d=>{setWeather(d.current);setWxLoading(false);})
+      .catch(()=>{setWeather(null);setWxLoading(false);});
+  },[prefs.offline,geoPos]);
+
+  // Trip updaters
+  const updDay=useCallback((i,f,v)=>setTrip(p=>({...p,itinerary:p.itinerary.map((d,j)=>j===i?{...d,[f]:v}:d)})),[]);
+  const updAct=useCallback((di,ai,f,v)=>setTrip(p=>({...p,itinerary:p.itinerary.map((d,j)=>j===di?{...d,activities:d.activities.map((a,k)=>k===ai?{...a,[f]:v}:a)}:d)})),[]);
+  const addAct=useCallback(di=>setTrip(p=>({...p,itinerary:p.itinerary.map((d,j)=>j===di?{...d,activities:[...d.activities,{time:"00h00",label:"Nouvelle activité",url:""}]}:d)})),[]);
+  const rmAct=useCallback((di,ai)=>setTrip(p=>({...p,itinerary:p.itinerary.map((d,j)=>j===di?{...d,activities:d.activities.filter((_,k)=>k!==ai)}:d)})),[]);
+
+  const adjustItinerary=useCallback((start,end)=>{
+    if(!start||!end)return;
+    const s=new Date(start),e=new Date(end);s.setHours(0,0,0,0);e.setHours(0,0,0,0);
+    const n=Math.max(1,Math.round((e-s)/86400000)+1);
+    setTrip(p=>{
+      let itin=[...p.itinerary];
+      while(itin.length<n)itin.push({day:itin.length+1,emoji:"📅",title:`Jour ${itin.length+1}`,lodging:"",activities:[{time:"09h00",label:"Activité",url:""}]});
+      return{...p,itinerary:itin.slice(0,n).map((d,i)=>({...d,day:i+1})),startDate:start,endDate:end};
+    });
+  },[]);
+
+  // Budget
+  const addExpense=useCallback(idx=>{
+    const val=parseFloat(expInput[idx]||0);if(isNaN(val)||val<=0)return;
+    const lbl=expLabel[idx]||"Dépense";
+    setTrip(p=>({...p,budget:p.budget.map((b,i)=>i===idx?{...b,expenses:[...b.expenses,{label:lbl,amount:val,date:new Date().toLocaleDateString("fr-FR")}]}:b)}));
+    setExpInput(p=>({...p,[idx]:""}));setExpLabel(p=>({...p,[idx]:""}));
+  },[expInput,expLabel]);
+  const rmExpense=useCallback((bi,ei)=>setTrip(p=>({...p,budget:p.budget.map((b,i)=>i===bi?{...b,expenses:b.expenses.filter((_,j)=>j!==ei)}:b)})),[]);
+  const{totalSpent,budgetSummary}=useMemo(()=>{
+    const s=trip.budget.map(b=>({...b,spent:sumExp(b.expenses)}));
+    return{totalSpent:s.reduce((a,b)=>a+b.spent,0),budgetSummary:s};
+  },[trip.budget]);
+
+  // Archive
+  const archiveTrip=useCallback(()=>{setArchives(p=>[...p,{...trip,archived:true,archivedAt:new Date().toISOString()}]);setTrip(DEFAULT_TRIP);setPlaces(DEFAULT_PLACES);},[trip]);
+  const restoreArchive=useCallback(idx=>{setArchives(p=>p.filter((_,i)=>i!==idx));setTrip({...archives[idx],archived:false});},[archives]);
+  const deleteArchive=useCallback(idx=>setArchives(p=>p.filter((_,i)=>i!==idx)),[]);
+
+  // Checklist
+  const toggleCheck=useCallback(k=>setChecked(p=>({...p,[k]:!p[k]})),[]);
+  const addItem=useCallback(()=>{const txt=newItemText.trim();if(!txt)return;setClCats(p=>p.map((c,i)=>i===newItemCat?{...c,items:[...c.items,txt]}:c));setNewItemText("");},[newItemText,newItemCat]);
+  const rmItem=useCallback((ci,ii)=>setClCats(p=>p.map((c,i)=>i===ci?{...c,items:c.items.filter((_,j)=>j!==ii)}:c)),[]);
+  const addCat=useCallback(()=>{const txt=newCatText.trim();if(!txt)return;setClCats(p=>[...p,{cat:txt,items:[]}]);setNewCatText("");},[newCatText]);
+  const rmCat=useCallback(ci=>setClCats(p=>p.filter((_,i)=>i!==ci)),[]);
+  const{checkTotal,checkDone}=useMemo(()=>({checkTotal:clCats.reduce((a,c)=>a+c.items.length,0),checkDone:Object.values(checked).filter(Boolean).length}),[clCats,checked]);
+
+  const collapseKey=useCallback(k=>setCollapsed(p=>({...p,[k]:!p[k]})),[]);
+  const isOpen=useCallback(k=>!collapsed[k],[collapsed]);
+  const mapMarkers=useMemo(()=>places.map(p=>({lat:p.lat,lng:p.lng,label:p.name})),[places]);
+  const todayDayObj=trip.itinerary[Math.min(tripDayIdx??0,trip.itinerary.length-1)];
+  const todayDate=tripDayIdx!==null?addDays(trip.startDate,tripDayIdx):null;
+
+  // Header edit
+  const startEdit=useCallback(f=>{setHeaderEdit(f);setHeaderVal(trip[f]??"");},[trip]);
+  const commitEdit=useCallback(()=>{
+    if(!headerEdit)return;
+    if(headerEdit==="startDate")adjustItinerary(headerVal,trip.endDate);
+    else if(headerEdit==="endDate")adjustItinerary(trip.startDate,headerVal);
+    else setTrip(p=>({...p,[headerEdit]:headerVal}));
+    setHeaderEdit(null);
+  },[headerEdit,headerVal,trip,adjustItinerary]);
+
+  // Lodging edit helpers (v4)
+  const openLodgeEdit=useCallback((dayIdx)=>{
+    setLodgeVal(trip.itinerary[dayIdx].lodging||"");
+    setEditingLodge(true);
+  },[trip.itinerary]);
+  const commitLodge=useCallback(()=>{
+    updDay(activeDay,"lodging",lodgeVal);
+    setEditingLodge(false);
+  },[activeDay,lodgeVal,updDay]);
+
+  const TABS=useMemo(()=>[{id:"resume",label:"Résumé",icon:"🌅"},{id:"itineraire",label:"Itinéraire",icon:"📅"},{id:"lieux",label:"Lieux",icon:"📍"},{id:"budget",label:"Budget",icon:"💰"},{id:"prep",label:"Prépa",icon:"🎒"}],[]);
+
+  const css=`
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500&display=swap');
+    .btn{transition:all .2s;cursor:pointer;}.btn:hover{opacity:.8;}
+    .ch{transition:transform .2s;}.ch:hover{transform:translateX(3px);}
+    .dp{transition:all .25s;cursor:pointer;}.dp:hover{transform:translateY(-2px);}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.fade{animation:fadeIn .35s ease forwards;}
+    @keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes shimmer{0%,100%{opacity:.4}50%{opacity:.9}}.shimmer{animation:shimmer 3s infinite;}
+    input,textarea,select{outline:none;}input::placeholder,textarea::placeholder{opacity:.4;}
+    .caret{cursor:pointer;transition:transform .25s;display:inline-block;}.caret.open{transform:rotate(180deg);}
+    .eh{cursor:text;border-bottom:1px dashed rgba(201,168,76,.5);}.eh:hover{border-bottom-color:rgba(201,168,76,.9);}
+    a{text-decoration:none;}
+  `;
+
+  return(
+    <div style={{fontFamily:"'Cormorant Garamond',Georgia,serif",background:t.bg,minHeight:"100vh",color:t.text,maxWidth:480,margin:"0 auto",position:"relative"}}>
+      <style>{css}</style>
+
+      {/* ══ PREFS ══ */}
+      <Sheet open={showPrefs} onClose={()=>setShowPrefs(false)} title="⚙️ Préférences" t={t}>
+        <div style={{fontSize:11,letterSpacing:3,color:t.accent,fontFamily:"'Jost',sans-serif",textTransform:"uppercase",marginBottom:10}}>Thème</div>
+        <div style={{display:"flex",gap:10,marginBottom:20}}>
+          {[["dark","🌙 Sombre"],["light","☀️ Clair"]].map(([k,l])=>(
+            <button key={k} className="btn" onClick={()=>setPrefs(p=>({...p,theme:k}))}
+              style={{flex:1,padding:"12px 0",borderRadius:12,background:prefs.theme===k?t.accentGrad:t.bgCard,color:prefs.theme===k?t.accentText:t.text,border:`1px solid ${prefs.theme===k?"transparent":t.border}`,fontFamily:"'Jost',sans-serif",fontSize:13,cursor:"pointer"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <div style={{borderTop:`1px solid ${t.border}`,paddingTop:8}}>
+          <Toggle value={prefs.offline} onChange={v=>setPrefs(p=>({...p,offline:v}))} label="🔌  Mode hors ligne" t={t}/>
+          <div style={{height:1,background:t.border}}/>
+          <Toggle value={prefs.geo} onChange={v=>setPrefs(p=>({...p,geo:v}))} label="📍  Géolocalisation" t={t}/>
+          {prefs.geo&&geoPos&&<div style={{fontSize:12,fontFamily:"'Jost',sans-serif",color:t.textMuted,paddingBottom:8}}>Position : {geoPos.lat}°N, {geoPos.lng}°E</div>}
+        </div>
+        <button className="btn" onClick={()=>{savePrefs(prefs);setShowPrefs(false);}}
+          style={{marginTop:20,width:"100%",padding:"13px",borderRadius:12,background:t.accentGrad,color:t.accentText,border:"none",fontFamily:"'Jost',sans-serif",fontSize:14,fontWeight:500}}>
+          💾 Enregistrer les préférences
+        </button>
+      </Sheet>
+
+      {/* ══ ARCHIVE ══ */}
+      <Sheet open={showArchive} onClose={()=>setShowArchive(false)} title="🗄️ Archives" t={t}>
+        {archives.length===0&&<div style={{fontSize:14,fontFamily:"'Jost',sans-serif",color:t.textMuted,textAlign:"center",padding:"20px 0"}}>Aucun voyage archivé</div>}
+        {archives.map((a,i)=>(
+          <div key={i} style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:12,padding:"14px 16px",marginBottom:10}}>
+            <div style={{fontSize:18,fontWeight:300,marginBottom:4}}>{a.destination}</div>
+            <div style={{fontSize:12,fontFamily:"'Jost',sans-serif",color:t.textMuted,marginBottom:12}}>{fmtDate(a.startDate)} → {fmtDate(a.endDate)}</div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn" onClick={()=>{restoreArchive(i);setShowArchive(false);}}
+                style={{flex:1,padding:"8px",borderRadius:8,background:t.accentGrad,color:t.accentText,border:"none",fontFamily:"'Jost',sans-serif",fontSize:13,cursor:"pointer"}}>↩ Réactiver</button>
+              <button className="btn" onClick={()=>deleteArchive(i)}
+                style={{padding:"8px 14px",borderRadius:8,background:"none",border:`1px solid ${t.danger}44`,color:t.danger,fontFamily:"'Jost',sans-serif",fontSize:13,cursor:"pointer"}}>🗑</button>
+            </div>
+          </div>
+        ))}
+        <div style={{height:1,background:t.border,margin:"16px 0"}}/>
+        <button className="btn" onClick={()=>{archiveTrip();setShowArchive(false);}}
+          style={{width:"100%",padding:"13px",borderRadius:12,background:"none",border:`1px solid ${t.border}`,color:t.text,fontFamily:"'Jost',sans-serif",fontSize:14,cursor:"pointer"}}>
+          📦 Archiver ce voyage
+        </button>
+      </Sheet>
+
+      {/* ══ EMOJI PICKER ══ */}
+      {emojiPickDay!==null&&(
+        <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:t.bgSheet,borderRadius:16,padding:20,width:300,border:`1px solid ${t.border}`}}>
+            <div style={{fontSize:16,marginBottom:12,color:t.text}}>Choisir un emoji</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {EMOJIS.map(e=>(
+                <button key={e} onClick={()=>{updDay(emojiPickDay,"emoji",e);setEmojiPickDay(null);}}
+                  style={{fontSize:22,background:"none",border:`1px solid ${t.border}`,borderRadius:8,padding:"5px 9px",cursor:"pointer"}}>{e}</button>
+              ))}
+            </div>
+            <button className="btn" onClick={()=>setEmojiPickDay(null)}
+              style={{marginTop:12,width:"100%",padding:"10px",background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:10,color:t.text,fontFamily:"'Jost',sans-serif",cursor:"pointer"}}>Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {/* ══ HEADER EDITOR ══ */}
+      {headerEdit&&(
+        <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}}>
+          <div style={{width:"100%",background:t.bgSheet,borderRadius:16,padding:24,border:`1px solid ${t.border}`}}>
+            <div style={{fontSize:16,color:t.text,marginBottom:14}}>
+              {headerEdit==="destination"?"🌍 Destination":headerEdit==="startDate"?"📅 Date de début":"📅 Date de fin"}
+            </div>
+            <input type={headerEdit.includes("Date")?"date":"text"} value={headerVal} onChange={e=>setHeaderVal(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&commitEdit()} autoFocus
+              style={{width:"100%",background:t.inputBg,border:`1px solid ${t.borderStrong}`,borderRadius:10,padding:"12px 14px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:16,marginBottom:14}}/>
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn" onClick={commitEdit}
+                style={{flex:1,padding:"12px",borderRadius:10,background:t.accentGrad,color:t.accentText,border:"none",fontFamily:"'Jost',sans-serif",fontSize:14,fontWeight:500,cursor:"pointer"}}>Confirmer</button>
+              <button className="btn" onClick={()=>setHeaderEdit(null)}
+                style={{padding:"12px 18px",borderRadius:10,background:"none",border:`1px solid ${t.border}`,color:t.text,fontFamily:"'Jost',sans-serif",cursor:"pointer"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ LODGE EDITOR MODAL (v4) ══ */}
+      {editingLodge&&(
+        <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}}>
+          <div style={{width:"100%",background:t.bgSheet,borderRadius:16,padding:24,border:`1px solid ${t.border}`}}>
+            <div style={{fontSize:16,color:t.text,marginBottom:14}}>🏠 Modifier le logement</div>
+            <textarea value={lodgeVal} onChange={e=>setLodgeVal(e.target.value)} rows={5}
+              style={{width:"100%",background:t.inputBg,border:`1px solid ${t.borderStrong}`,borderRadius:10,padding:"12px 14px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:14,resize:"vertical",marginBottom:14}}/>
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn" onClick={commitLodge}
+                style={{flex:1,padding:"12px",borderRadius:10,background:t.accentGrad,color:t.accentText,border:"none",fontFamily:"'Jost',sans-serif",fontSize:14,fontWeight:500,cursor:"pointer"}}>Enregistrer</button>
+              <button className="btn" onClick={()=>setEditingLodge(false)}
+                style={{padding:"12px 18px",borderRadius:10,background:"none",border:`1px solid ${t.border}`,color:t.text,fontFamily:"'Jost',sans-serif",cursor:"pointer"}}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ HEADER ══ */}
+      <div style={{padding:"48px 20px 14px",background:t.headerBg,borderBottom:`1px solid ${t.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:11,letterSpacing:4,color:t.accent,fontFamily:"'Jost',sans-serif",textTransform:"uppercase",marginBottom:4}}>Mon voyage</div>
+            <h1 style={{fontSize:32,fontWeight:300,lineHeight:1,marginBottom:6}}>
+              <span className="eh" onDoubleClick={()=>startEdit("destination")}>
+                {trip.destination.slice(0,-2)}<span style={{fontStyle:"italic",color:t.accent}}>{trip.destination.slice(-2)}</span>
+              </span>
+            </h1>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:"'Jost',sans-serif",lineHeight:2}}>
+              <span className="eh" onDoubleClick={()=>startEdit("startDate")}>{fmtDate(trip.startDate)}</span>
+              <span style={{margin:"0 6px"}}>→</span>
+              <span className="eh" onDoubleClick={()=>startEdit("endDate")}>{fmtDate(trip.endDate)}</span>
+              <span style={{marginLeft:8,opacity:.6}}>· {totalDays}j</span>
+            </div>
+            {daysUntil!==null&&(
+              <div style={{display:"inline-block",marginTop:8,padding:"4px 12px",borderRadius:20,
+                background:daysUntil>0?`${t.accent}20`:daysUntil===0?"#52b78820":"#e07a5f20",
+                border:`1px solid ${daysUntil>0?t.accent:daysUntil===0?"#52b788":"#e07a5f"}44`,
+                fontSize:11,fontFamily:"'Jost',sans-serif",
+                color:daysUntil>0?t.accent:daysUntil===0?"#52b788":"#e07a5f",letterSpacing:1}}>
+                {daysUntil>0?`J-${daysUntil} avant le départ`:daysUntil===0?"🛫 C'est aujourd'hui !":tripDayIdx!==null?`✈️ Jour ${tripDayIdx+1} sur ${totalDays}`:"Voyage terminé ✅"}
+              </div>
+            )}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginLeft:8}}>
+            <button className="btn" onClick={()=>setShowPrefs(true)} style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:10,padding:"7px 12px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:12,cursor:"pointer"}}>⚙️</button>
+            <button className="btn" onClick={()=>setShowArchive(true)} style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:10,padding:"7px 12px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:12,cursor:"pointer"}}>🗄️</button>
+          </div>
+        </div>
+        <div style={{fontSize:10,color:t.textMuted,fontFamily:"'Jost',sans-serif",marginTop:6,opacity:.55}}>Double-cliquer destination ou dates pour modifier</div>
+      </div>
+
+      {/* ══ TABS ══ */}
+      <div style={{display:"flex",borderBottom:`1px solid ${t.border}`,background:prefs.theme==="light"?"rgba(255,255,255,.5)":"rgba(0,0,0,.2)",position:"sticky",top:0,zIndex:10}}>
+        {TABS.map(tb=>(
+          <button key={tb.id} onClick={()=>setTab(tb.id)}
+            style={{flex:1,padding:"10px 2px 9px",background:tab===tb.id?t.tabActiveBg:"none",border:"none",borderBottom:tab===tb.id?`2px solid ${t.accent}`:"2px solid transparent",marginBottom:-1,cursor:"pointer",fontFamily:"'Jost',sans-serif",color:tab===tb.id?t.accent:t.textMuted,fontSize:9.5,letterSpacing:1.2,textTransform:"uppercase",transition:"all .2s"}}>
+            <div style={{fontSize:15,marginBottom:2}}>{tb.icon}</div>{tb.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ CONTENT ══ */}
+      <div className="fade" key={tab} style={{padding:"16px 16px 100px",minHeight:400}}>
+
+        {/* ─── RÉSUMÉ ─── */}
+        {tab==="resume"&&(
+          <div>
+            <div style={{fontSize:11,letterSpacing:3,color:t.accent,fontFamily:"'Jost',sans-serif",textTransform:"uppercase",marginBottom:12}}>
+              {tripDayIdx!==null?`Jour ${tripDayIdx+1} · ${fmtDateShort(todayDate)}`:"Aperçu Jour 1"}
+            </div>
+            <div style={{display:"flex",gap:10,marginBottom:14}}>
+              <div style={{flex:1,background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:14,padding:"13px 15px"}}>
+                <div style={{fontSize:10,fontFamily:"'Jost',sans-serif",color:t.textMuted,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>Météo locale</div>
+                {prefs.offline?<div style={{fontSize:13,fontFamily:"'Jost',sans-serif",color:t.textMuted}}>Hors ligne</div>
+                :wxLoading?<div style={{fontSize:13,fontFamily:"'Jost',sans-serif",color:t.textMuted}} className="shimmer">Chargement…</div>
+                :weather?<div>
+                  <div style={{fontSize:24,fontWeight:300}}>{weather.temperature_2m}°C</div>
+                  <div style={{fontSize:12,fontFamily:"'Jost',sans-serif",color:t.textMuted,marginTop:2}}>{WMO[weather.weathercode]??`Code ${weather.weathercode}`}</div>
+                  <div style={{fontSize:11,fontFamily:"'Jost',sans-serif",color:t.textMuted}}>💨 {weather.windspeed_10m} km/h</div>
+                </div>:<div style={{fontSize:13,fontFamily:"'Jost',sans-serif",color:t.textMuted}}>Indisponible</div>}
+              </div>
+              {prefs.geo&&(
+                <div style={{flex:1,background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:14,padding:"13px 15px"}}>
+                  <div style={{fontSize:10,fontFamily:"'Jost',sans-serif",color:t.textMuted,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>Position GPS</div>
+                  {geoPos?<div style={{fontSize:13,fontFamily:"'Jost',sans-serif",lineHeight:1.7}}>📍 {geoPos.lat}°N<br/>{geoPos.lng}°E</div>
+                  :<div style={{fontSize:13,fontFamily:"'Jost',sans-serif",color:t.textMuted}} className="shimmer">Localisation…</div>}
+                </div>
+              )}
+            </div>
+            <div style={{marginBottom:14,borderRadius:14,overflow:"hidden",border:`1px solid ${t.border}`}}>
+              <LeafletMap lat={geoPos?.lat??16.1} lng={geoPos?.lng??-61.73} zoom={9} height={180} markers={mapMarkers}/>
+            </div>
+            <div style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:16,overflow:"hidden"}}>
+              <div onClick={()=>collapseKey("resume-acts")} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",background:`linear-gradient(90deg,${t.accent}14,transparent)`,cursor:"pointer",borderBottom:`1px solid ${t.border}`}}>
+                <div>
+                  <div style={{fontSize:10,fontFamily:"'Jost',sans-serif",color:t.accent,letterSpacing:3,textTransform:"uppercase"}}>{todayDayObj?.title}</div>
+                  <div style={{fontSize:22,marginTop:2}}>{todayDayObj?.emoji}</div>
+                </div>
+                <span className={`caret ${isOpen("resume-acts")?"open":""}`} style={{color:t.textMuted}}>▼</span>
+              </div>
+              {isOpen("resume-acts")&&todayDayObj?.activities.map((a,i)=>(
+                <div key={i} style={{display:"flex",gap:14,padding:"10px 18px",borderBottom:i<todayDayObj.activities.length-1?`1px solid ${t.border}`:"none",alignItems:"flex-start"}}>
+                  <div style={{fontSize:12,fontFamily:"'Jost',sans-serif",color:t.accent,minWidth:46,flexShrink:0,paddingTop:2}}>{a.time}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:300}}>{a.label}</div>
+                    {a.url&&<a href={a.url} target="_blank" rel="noopener noreferrer"
+                      style={{fontSize:11,color:t.accent,fontFamily:"'Jost',sans-serif",display:"inline-flex",alignItems:"center",gap:4,marginTop:3,opacity:.8}}>
+                      🔗 Voir le lien
+                    </a>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── ITINÉRAIRE ─── */}
+        {tab==="itineraire"&&(
+          <div>
+            <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:12,marginBottom:16}}>
+              {trip.itinerary.map((d,i)=>(
+                <div key={i} className="dp" onClick={()=>{setActiveDay(i);setEditingLodge(false);}}
+                  style={{minWidth:58,padding:"9px 6px",borderRadius:12,textAlign:"center",background:activeDay===i?t.accentGrad:t.bgCard,border:`1px solid ${activeDay===i?"transparent":t.border}`,color:activeDay===i?t.accentText:t.text}}>
+                  <div style={{fontSize:18}}>{d.emoji}</div>
+                  <div style={{fontSize:10,fontFamily:"'Jost',sans-serif",fontWeight:500,marginTop:2}}>J{d.day}</div>
+                </div>
+              ))}
+            </div>
+            {(()=>{
+              const day=trip.itinerary[activeDay];
+              const dayDate=addDays(trip.startDate,activeDay);
+              return(
+                <div style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:16,overflow:"hidden"}}>
+                  {/* Day header */}
+                  <div style={{padding:"14px 16px",background:`linear-gradient(90deg,${t.accent}14,transparent)`,borderBottom:`1px solid ${t.border}`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:26,cursor:"pointer"}} onClick={()=>setEmojiPickDay(activeDay)}>{day.emoji}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:10,fontFamily:"'Jost',sans-serif",color:t.accent,letterSpacing:3,textTransform:"uppercase"}}>Jour {day.day} · {fmtDate(dayDate)}</div>
+                        {/* Editable title inline */}
+                        <EditableInline value={day.title} onChange={v=>updDay(activeDay,"title",v)} t={t} style={{fontSize:19,fontWeight:300}}/>
+                      </div>
+                    </div>
+                    <div style={{fontSize:10,fontFamily:"'Jost',sans-serif",color:t.textMuted,marginTop:6}}>Tap emoji · Double-clic titre</div>
+                  </div>
+
+                  {/* LOGEMENT (v4 style : affichage formaté + bouton Modifier) */}
+                  <div style={{borderBottom:`1px solid ${t.border}`}}>
+                    <div onClick={()=>collapseKey(`lodge-${activeDay}`)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",cursor:"pointer"}}>
+                      <span style={{fontFamily:"'Jost',sans-serif",fontSize:13,fontWeight:500,color:t.accent}}>🏠 Logement</span>
+                      <span className={`caret ${isOpen(`lodge-${activeDay}`)?"open":""}`} style={{fontSize:12,color:t.textMuted}}>▼</span>
+                    </div>
+                    {isOpen(`lodge-${activeDay}`)&&(
+                      <div style={{padding:"0 16px 14px"}}>
+                        {day.lodging?(
+                          <div>
+                            {day.lodging.split("\n").map((line,li)=>(
+                              <div key={li} style={{fontSize:li===0?15:13,fontWeight:li===0?400:300,color:li===0?t.text:t.textMuted,fontFamily:li===0?"inherit":"'Jost',sans-serif",lineHeight:1.7}}>{line}</div>
+                            ))}
+                          </div>
+                        ):(
+                          <div style={{fontSize:13,fontFamily:"'Jost',sans-serif",color:t.textMuted}}>Aucun logement renseigné</div>
+                        )}
+                        <button className="btn" onClick={()=>openLodgeEdit(activeDay)}
+                          style={{marginTop:10,padding:"7px 16px",borderRadius:8,background:"none",border:`1px solid ${t.accent}44`,color:t.accent,fontFamily:"'Jost',sans-serif",fontSize:12,cursor:"pointer"}}>
+                          ✏️ Modifier
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ACTIVITÉS */}
+                  <div>
+                    <div onClick={()=>collapseKey(`act-${activeDay}`)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",cursor:"pointer"}}>
+                      <span style={{fontFamily:"'Jost',sans-serif",fontSize:13,fontWeight:500,color:t.accent}}>🎒 Activités</span>
+                      <span className={`caret ${isOpen(`act-${activeDay}`)?"open":""}`} style={{fontSize:12,color:t.textMuted}}>▼</span>
+                    </div>
+                    {isOpen(`act-${activeDay}`)&&(
+                      <div style={{padding:"0 16px 14px"}}>
+                        {day.activities.map((a,ai)=>(
+                          <div key={ai} style={{padding:"9px 0",borderBottom:`1px solid ${t.border}`}}>
+                            <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                              <EditableInline value={a.time} onChange={v=>updAct(activeDay,ai,"time",v)} t={t} style={{fontSize:12,fontFamily:"'Jost',sans-serif",color:t.accent,minWidth:46,flexShrink:0}}/>
+                              <div style={{flex:1}}>
+                                <EditableInline value={a.label} onChange={v=>updAct(activeDay,ai,"label",v)} t={t} style={{fontSize:14,fontWeight:300,color:t.text}}/>
+                                {a.url&&<a href={a.url} target="_blank" rel="noopener noreferrer"
+                                  style={{fontSize:11,color:t.accent,fontFamily:"'Jost',sans-serif",display:"inline-flex",alignItems:"center",gap:4,marginTop:3,opacity:.8}}>
+                                  🔗 {a.url.replace(/https?:\/\/(www\.)?/,"").split("/")[0]}
+                                </a>}
+                              </div>
+                              <button onClick={()=>rmAct(activeDay,ai)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:18,padding:"0 4px",flexShrink:0}}>×</button>
+                            </div>
+                          </div>
+                        ))}
+                        <button className="btn" onClick={()=>addAct(activeDay)}
+                          style={{marginTop:10,width:"100%",padding:"9px",borderRadius:10,background:"none",border:`1px dashed ${t.border}`,color:t.textMuted,fontFamily:"'Jost',sans-serif",fontSize:13,cursor:"pointer"}}>
+                          + Ajouter une activité
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ─── LIEUX ─── */}
+        {tab==="lieux"&&(
+          <div>
+            <div style={{fontSize:12,color:t.textMuted,fontFamily:"'Jost',sans-serif",marginBottom:12}}>{places.length} incontournables</div>
+            <div style={{marginBottom:14,borderRadius:14,overflow:"hidden",border:`1px solid ${t.border}`}}>
+              <LeafletMap lat={16.0} lng={-61.73} zoom={8} height={200} markers={mapMarkers}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:9}}>
+              {places.map((p,i)=>(
+                <div key={i} className="ch" style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 14px"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                    <div style={{fontSize:22,flexShrink:0}}>{p.icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:15,fontWeight:400}}>{p.name}</div>
+                      <div style={{fontSize:12,color:t.textMuted,fontFamily:"'Jost',sans-serif",marginTop:2}}>{p.note}</div>
+                      {p.url&&<a href={p.url} target="_blank" rel="noopener noreferrer"
+                        style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:6,fontSize:11,fontFamily:"'Jost',sans-serif",color:t.accent,background:`${t.accent}15`,padding:"3px 10px",borderRadius:20,border:`1px solid ${t.accent}33`}}>
+                        🔗 {p.url.replace(/https?:\/\/(www\.)?/,"").split("/")[0]}
+                      </a>}
+                    </div>
+                    <div style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",padding:"3px 7px",borderRadius:20,background:`${CAT_COLORS[p.cat]||"#888"}22`,color:CAT_COLORS[p.cat]||"#888",border:`1px solid ${CAT_COLORS[p.cat]||"#888"}44`,fontFamily:"'Jost',sans-serif",whiteSpace:"nowrap",flexShrink:0}}>{p.cat}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── BUDGET ─── */}
+        {tab==="budget"&&(
+          <div>
+            <div style={{background:`linear-gradient(135deg,${t.accent}18,${t.accent}06)`,border:`1px solid ${t.accent}30`,borderRadius:16,padding:"16px 18px",marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:11,letterSpacing:3,color:t.accent,fontFamily:"'Jost',sans-serif",textTransform:"uppercase"}}>Total dépensé</div>
+                  <div style={{fontSize:30,fontWeight:300,marginTop:2}}>{totalSpent.toFixed(2)} €</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:11,color:t.textMuted,fontFamily:"'Jost',sans-serif",letterSpacing:2,textTransform:"uppercase"}}>{trip.budget.length} catégories</div>
+                </div>
+              </div>
+              {totalSpent>0&&(
+                <div style={{display:"flex",gap:2,height:6,borderRadius:3,overflow:"hidden"}}>
+                  {budgetSummary.filter(b=>b.spent>0).map((b,i)=>(
+                    <div key={i} style={{flex:b.spent,background:["#c9a84c","#00b4d8","#52b788","#f4a261","#e07a5f","#c77dff"][i%6]}}/>
+                  ))}
+                </div>
+              )}
+            </div>
+            {budgetSummary.map((b,bi)=>{
+              const open=isOpen(`budget-${bi}`);
+              return(
+                <div key={bi} style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:13,marginBottom:10,overflow:"hidden"}}>
+                  <div onClick={()=>collapseKey(`budget-${bi}`)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",cursor:"pointer"}}>
+                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                      <span style={{fontSize:20}}>{b.icon}</span>
+                      <span style={{fontFamily:"'Jost',sans-serif",fontSize:14}}>{b.label}</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{color:t.accent,fontSize:14,fontFamily:"'Jost',sans-serif"}}>{b.spent.toFixed(0)} €</span>
+                      <span className={`caret ${open?"open":""}`} style={{fontSize:11,color:t.textMuted}}>▼</span>
+                    </div>
+                  </div>
+                  {open&&(
+                    <div style={{padding:"0 14px 14px"}}>
+                      {b.expenses.map((e,ei)=>(
+                        <div key={ei} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:`1px solid ${t.border}`,fontSize:13}}>
+                          <span style={{fontFamily:"'Jost',sans-serif",color:t.textMuted,flex:1}}>{e.date} · {e.label}</span>
+                          <span style={{color:t.accent,fontFamily:"'Jost',sans-serif",marginRight:10}}>{e.amount.toFixed(2)}€</span>
+                          <button onClick={()=>rmExpense(bi,ei)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:16}}>×</button>
+                        </div>
+                      ))}
+                      <div style={{display:"flex",gap:6,marginTop:b.expenses.length>0?10:0}}>
+                        <input placeholder="Libellé" value={expLabel[bi]||""} onChange={e=>setExpLabel(p=>({...p,[bi]:e.target.value}))}
+                          style={{flex:2,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:8,padding:"7px 10px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:12}}/>
+                        <input type="number" placeholder="€" value={expInput[bi]||""} onChange={e=>setExpInput(p=>({...p,[bi]:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&addExpense(bi)}
+                          style={{flex:1,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:8,padding:"7px 8px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:12}}/>
+                        <button className="btn" onClick={()=>addExpense(bi)}
+                          style={{background:t.accentGrad,border:"none",borderRadius:8,padding:"7px 14px",color:t.accentText,fontFamily:"'Jost',sans-serif",fontSize:14,fontWeight:500}}>+</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ─── PRÉPA ─── */}
+        {tab==="prep"&&(
+          <div>
+            <div style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:14,padding:"14px 18px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:11,letterSpacing:3,color:t.accent,fontFamily:"'Jost',sans-serif",textTransform:"uppercase"}}>Progression</div>
+                <div style={{fontSize:26,fontWeight:300,marginTop:2}}>{checkDone} <span style={{fontSize:14,color:t.textMuted}}>/ {checkTotal}</span></div>
+              </div>
+              <div style={{width:52,height:52,borderRadius:"50%",background:`conic-gradient(${t.accent} ${checkTotal>0?(checkDone/checkTotal)*360:0}deg,rgba(128,128,128,.15) 0)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:prefs.theme==="dark"?"#0d2137":"#f7f3ed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontFamily:"'Jost',sans-serif",color:t.text}}>
+                  {checkTotal>0?Math.round((checkDone/checkTotal)*100):0}%
+                </div>
+              </div>
+            </div>
+            {/* Add item */}
+            <div style={{background:t.bgCard,border:`1px solid ${t.accent}22`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+              <div style={{fontSize:11,letterSpacing:3,color:t.accent,fontFamily:"'Jost',sans-serif",textTransform:"uppercase",marginBottom:10}}>✨ Ajouter</div>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                <select value={newItemCat} onChange={e=>setNewItemCat(+e.target.value)}
+                  style={{flex:1,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 10px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:13}}>
+                  {clCats.map((c,i)=><option key={i} value={i}>{c.cat}</option>)}
+                </select>
+              </div>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                <input placeholder="Nouvel élément…" value={newItemText} onChange={e=>setNewItemText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()}
+                  style={{flex:1,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 12px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:13}}/>
+                <button className="btn" onClick={addItem}
+                  style={{background:t.accentGrad,border:"none",borderRadius:8,padding:"8px 16px",color:t.accentText,fontFamily:"'Jost',sans-serif",fontSize:14,fontWeight:500}}>+</button>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <input placeholder="Nouvelle catégorie…" value={newCatText} onChange={e=>setNewCatText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCat()}
+                  style={{flex:1,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 12px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:12}}/>
+                <button className="btn" onClick={addCat}
+                  style={{background:"none",border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 12px",color:t.text,fontFamily:"'Jost',sans-serif",fontSize:12}}>+ Catégorie</button>
+              </div>
+            </div>
+            {clCats.map((cat,ci)=>(
+              <div key={ci} style={{marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+                  <div style={{fontSize:11,letterSpacing:3,color:t.accent,fontFamily:"'Jost',sans-serif",textTransform:"uppercase"}}>{cat.cat}</div>
+                  {cat.items.length===0&&<button onClick={()=>rmCat(ci)} style={{background:"none",border:`1px solid ${t.danger}44`,borderRadius:6,padding:"2px 8px",color:t.danger,fontFamily:"'Jost',sans-serif",fontSize:11,cursor:"pointer"}}>Supprimer</button>}
+                </div>
+                <div style={{background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:12,overflow:"hidden"}}>
+                  {cat.items.length===0&&<div style={{padding:"12px 16px",fontSize:13,fontFamily:"'Jost',sans-serif",color:t.textMuted}}>Vide – ajoutez des éléments ci-dessus</div>}
+                  {cat.items.map((item,ii)=>{
+                    const k=`${cat.cat}-${item}-${ii}`;const done=checked[k];
+                    return(
+                      <div key={ii} style={{display:"flex",alignItems:"center",borderBottom:ii<cat.items.length-1?`1px solid ${t.border}`:"none"}}>
+                        <div onClick={()=>toggleCheck(k)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",flex:1,cursor:"pointer",opacity:done?.5:1}}>
+                          <div style={{width:20,height:20,borderRadius:6,border:done?"none":`1.5px solid ${t.accent}60`,background:done?t.accentGrad:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:t.accentText,flexShrink:0}}>{done&&"✓"}</div>
+                          <div style={{fontSize:14,fontFamily:"'Jost',sans-serif",fontWeight:300,textDecoration:done?"line-through":"none",color:done?t.textMuted:t.text}}>{item}</div>
+                        </div>
+                        <button onClick={()=>rmItem(ci,ii)} style={{background:"none",border:"none",color:t.textMuted,cursor:"pointer",fontSize:16,padding:"0 14px",opacity:.5}}>×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── EDITABLE INLINE ───────────────────────────────────────────────────────────
+function EditableInline({value,onChange,style,t}){
+  const[editing,setEditing]=useState(false);
+  const[val,setVal]=useState(value);
+  const ref=useRef();
+  useEffect(()=>setVal(value),[value]);
+  useEffect(()=>{if(editing&&ref.current)ref.current.focus();},[editing]);
+  const commit=()=>{setEditing(false);if(val!==value)onChange(val);};
+  if(!editing)return<span onDoubleClick={()=>setEditing(true)} style={{...style,cursor:"text",borderBottom:"1px dashed rgba(201,168,76,.4)",display:"inline",fontFamily:"inherit"}}>{val}</span>;
+  return<input ref={ref} value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} onKeyDown={e=>e.key==="Enter"&&commit()}
+    style={{...style,background:"transparent",border:"1px solid rgba(201,168,76,.5)",borderRadius:6,padding:"2px 6px",fontFamily:"inherit",outline:"none",width:"100%"}}/>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
